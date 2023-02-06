@@ -1,4 +1,4 @@
-module ws
+module github.com/romyMELI/webSocket
 
 go 1.19
 

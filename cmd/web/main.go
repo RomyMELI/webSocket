@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
-	"ws/internal/handlers"
+	"github.com/romyMELI/webSocket/internal/handlers"
 )
 
 func main() {
