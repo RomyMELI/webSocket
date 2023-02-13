@@ -38,6 +38,8 @@
                 <input type="text" name="message" id="message" class="form-control" autocomplete="off">
             </div>
 
+            <hr> 
+            <a href="javascript:void(0);" class="btn ntn-outline-secondary" id="sendBtn">Send Message</a>
             <input type="hidden" name="action" id="action">
 
             <hr>
@@ -63,6 +65,7 @@
 
 <script>
     let socket = null;
+    let o = document.getElementById("output");
 
     window.onbeforeunload = function(){
         console.log("Leaving");
@@ -88,9 +91,6 @@
         }
 
         socket.onmessage = msg => {
-            // console.log(msg);
-            // let j = JSOB.parse(msg.data);
-            // console.log(j);
 
             let data = JSON.parse(msg.data)
             console.log("Action is: ", data.action)
@@ -109,6 +109,10 @@
                         })
                     }
                     break;
+
+                case "broadcast": 
+                    o.innerHTML=  o.innerHTML + data.message + "<br>";
+                    break;
             }
         }
 
@@ -121,6 +125,29 @@
             socket.send(JSON.stringify(jsonData));
 
         })
+
+        document.getElementsById("message").addEventListener("keyDown",function(event){
+            if (event.code === "Event"){
+                if (!socket){
+                    console.log("no connection");
+                    return false;
+                }
+                event.preventDefault();
+                event.stopProgagation();
+                sendMessage();
+            }
+        })
+
     })
+
+    function sendMessage (){
+        let jsonData = {};
+        jsonData["action"]= "broadcast";
+        jsonData["username"]= document.getElementsById("username").value;
+        jsonData["message"]= document.getElementsById("message").value;
+        socket.send(JSON.stringify(jsonData));
+        
+        document.getElementsById("message").value= "";
+    }
 </script>
 </html>
