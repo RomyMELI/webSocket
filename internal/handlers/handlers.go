@@ -1,16 +1,19 @@
 package handlers
 
 import (
+	"fmt"
+	"log"
+	"net/http"
+	"sort"
+
 	"github.com/CloudyKit/jet/v6"
 	"github.com/gorilla/websocket"
-	"log"
-	"fmt"
-	"sort"
-	"net/http"
 )
 
 var wsChan = make(chan WsPayload)
+
 var clients = make(map[WebSocketConnection]string)
+
 // views is the jet view set
 var views = jet.NewSet(
 	jet.NewOSFileSystemLoader("./html"),
@@ -38,9 +41,9 @@ type WebSocketConnection struct {
 
 // WsJsonResponse defines the response sent back from websocket
 type WsJsonResponse struct {
-	Action      string `json:"action"`
-	Message     string `json:"message"`
-	MessageType string `json:"message_type"`
+	Action         string   `json:"action"`
+	Message        string   `json:"message"`
+	MessageType    string   `json:"message_type"`
 	ConnectedUsers []string `json:"connected_users"`
 }
 
@@ -65,7 +68,8 @@ func WsEndpoint(w http.ResponseWriter, r *http.Request) {
 	response.Message = `<em><small>Connected to server</small></em>`
 
 	conn := WebSocketConnection{Conn: ws}
-	clients[conn]=""
+	clients[conn] = ""
+
 	err = ws.WriteJSON(response)
 	if err != nil {
 		log.Println(err)
@@ -74,78 +78,79 @@ func WsEndpoint(w http.ResponseWriter, r *http.Request) {
 	go ListenForWs(&conn)
 }
 
-func ListenForWs (conn *WebSocketConnection){
-	defer func(){
-		if r:= recover(); r!=nil{
-			log.Println("Error",fmt.Sprintf("%v",r))
+func ListenForWs(conn *WebSocketConnection) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("Error", fmt.Sprintf("%v", r))
 		}
 	}()
+
 	var payload WsPayload
+
 	for {
-		err:= conn.ReadJSON(&payload)
-		if err!= nil{
+		err := conn.ReadJSON(&payload)
+		if err != nil {
 			// do nothing
-		}else{
+		} else {
 			payload.Conn = *conn
 			wsChan <- payload
 		}
 	}
 }
-//write in console browser the what actions is happening:
-func ListenToWsChannel (){
+
+func ListenToWsChannel() {
 	var response WsJsonResponse
+
 	for {
-		e := <- wsChan
-	switch e.Action {
-	case "username":
-		// get a list of all users and send it back via broadcast
-		clients[e.Conn]= e.Username
-		users:= getUserList()
-		response.Action = "list_users"
-		response.ConnectedUsers = users
-		broadCastToAll(response)
+		e := <-wsChan
 
-	case "left":
-		response.Action= "list_users"
-		delete(clients,e.Conn)
-		users:= getUserList()
-		response.ConnectedUsers= users
-		broadCastToAll(response)
+		switch e.Action {
+		case "username":
+			// get a list of all users and send it back via broadcast
+			clients[e.Conn] = e.Username
+			users := getUserList()
+			response.Action = "list_users"
+			response.ConnectedUsers = users
+			broadcastToAll(response)
 
-	case "broadcast":
-		response.Action= "broadcast"
-		response.Message= fmt.Sprintf("<strong>%s</strong>: %s", e.Username, e.Message)
-		broadCastToAll(response)
+		case "left":
+			// handle the situation where a user leaves the page
+			response.Action = "list_users"
+			delete(clients, e.Conn)
+			users := getUserList()
+			response.ConnectedUsers = users
+			broadcastToAll(response)
 
-	}
-	//	response.Action = "Got here"
-	//	response.Message = fmt.Sprintf("Some message, and action was %s", e.Action)
-	//	broadCastToAll(response)
+		case "broadcast":
+			response.Action = "broadcast"
+			response.Message = fmt.Sprintf("<strong>%s</strong>: %s", e.Username, e.Message)
+			broadcastToAll(response)
+		}
 	}
 }
 
-func getUserList() []string{
+func getUserList() []string {
 	var userList []string
-	for _, v := range clients {
-		if v != "" {
-			userList= append(userList,v)
+	for _, x := range clients {
+		if x != "" {
+			userList = append(userList, x)
 		}
 	}
-
 	sort.Strings(userList)
 	return userList
 }
 
-func broadCastToAll (response WsJsonResponse){
-	for client := range clients{
-		err:= client.WriteJSON(response)
-		if err != nil{
+func broadcastToAll(response WsJsonResponse) {
+	for client := range clients {
+		err := client.WriteJSON(response)
+		if err != nil {
 			log.Println("websocket err")
-			_ =client.Close()
-			delete(clients,client)
+			_ = client.Close()
+			delete(clients, client)
 		}
 	}
 }
+
 // renderPage renders a jet template
 func renderPage(w http.ResponseWriter, tmpl string, data jet.VarMap) error {
 	view, err := views.GetTemplate(tmpl)
